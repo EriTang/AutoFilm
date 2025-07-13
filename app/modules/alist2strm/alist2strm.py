@@ -281,8 +281,14 @@ class Alist2Strm:
                     logger.debug(f"重新获取 BDMV 文件详细信息: {largest_file.full_path}")
                     detailed_file = await self.client.get_path_detail(largest_file.full_path)
                     if detailed_file:
+                        # 保持 full_path 一致性，只更新详细信息
+                        detailed_file.full_path = largest_file.full_path
                         largest_file = detailed_file
                         self.bdmv_largest_files[bdmv_root] = detailed_file
+                
+                # 获取本地路径并添加到 processed_local_paths
+                local_path = self.__get_local_path(largest_file)
+                self.processed_local_paths.add(local_path)
                 
                 # 使用统一的文件处理逻辑，确保 URL 生成一致
                 await self.__file_processer(largest_file)
