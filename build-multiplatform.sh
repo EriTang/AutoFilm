@@ -68,11 +68,11 @@ docker buildx inspect
 
 # 构建并推送
 print_info "开始构建多平台镜像..."
-print_info "支持平台: linux/amd64, linux/arm64, linux/arm/v7"
+print_info "支持平台: linux/amd64, linux/arm64"
 print_info "推送到: ${REGISTRY}/${GITHUB_USERNAME}/${IMAGE_NAME}"
 
 docker buildx build \
-    --platform linux/amd64,linux/arm64,linux/arm/v7 \
+    --platform linux/amd64,linux/arm64 \
     --tag ${REGISTRY}/${GITHUB_USERNAME}/${IMAGE_NAME}:latest \
     --tag ${REGISTRY}/${GITHUB_USERNAME}/${IMAGE_NAME}:${VERSION} \
     --tag ${REGISTRY}/${GITHUB_USERNAME}/${IMAGE_NAME}:bdmv-enhanced \
