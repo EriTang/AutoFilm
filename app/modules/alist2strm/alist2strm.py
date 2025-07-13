@@ -274,8 +274,12 @@ class Alist2Strm:
         self._finalize_bdmv_collections()
         
         # 第二阶段：处理 BDMV 最大文件
+        logger.info(f"开始处理 {len(self.bdmv_largest_files)} 个 BDMV 目录")
         for bdmv_root, largest_file in self.bdmv_largest_files.items():
             try:
+                logger.info(f"处理 BDMV 目录: {bdmv_root}")
+                logger.info(f"最大文件: {largest_file.full_path}")
+                
                 # 如果是 RawURL 模式，需要重新获取文件的详细信息以确保有 raw_url
                 if self.mode == "RawURL" and not largest_file.raw_url:
                     logger.debug(f"重新获取 BDMV 文件详细信息: {largest_file.full_path}")
@@ -285,16 +289,24 @@ class Alist2Strm:
                         detailed_file.full_path = largest_file.full_path
                         largest_file = detailed_file
                         self.bdmv_largest_files[bdmv_root] = detailed_file
+                        logger.info(f"重新获取详细信息成功，raw_url: {detailed_file.raw_url}")
+                    else:
+                        logger.warning(f"重新获取详细信息失败: {largest_file.full_path}")
                 
                 # 获取本地路径并添加到 processed_local_paths
+                logger.debug(f"获取本地路径...")
                 local_path = self.__get_local_path(largest_file)
+                logger.info(f"本地路径: {local_path}")
                 self.processed_local_paths.add(local_path)
                 
                 # 使用统一的文件处理逻辑，确保 URL 生成一致
+                logger.debug(f"开始文件处理...")
                 await self.__file_processer(largest_file)
-                logger.debug(f"BDMV 文件处理完成: {largest_file.name}")
+                logger.info(f"BDMV 文件处理完成: {largest_file.name}")
             except Exception as e:
                 logger.error(f"处理 BDMV 文件 {largest_file.full_path} 时出错：{e}")
+                import traceback
+                logger.error(f"详细错误信息: {traceback.format_exc()}")
                 continue
 
         # 第三阶段：处理普通文件
@@ -314,6 +326,9 @@ class Alist2Strm:
         :param path: AlistPath 对象
         """
         local_path = self.__get_local_path(path)
+        logger.debug(f"__file_processer: 处理文件 {path.full_path}")
+        logger.debug(f"__file_processer: 本地路径 {local_path}")
+        logger.debug(f"__file_processer: 模式 {self.mode}")
 
         # 统一的 URL 生成逻辑，BDMV 文件与普通文件使用相同的逻辑
         if self.mode == "AlistURL":
@@ -325,6 +340,8 @@ class Alist2Strm:
         else:
             raise ValueError(f"AlistStrm 未知的模式 {self.mode}")
 
+        logger.debug(f"__file_processer: 初始 content = {content}")
+
         # 如果 URL 为空，提供 fallback（适用于所有文件类型）
         if not content:
             if self.mode == "AlistURL":
@@ -333,6 +350,7 @@ class Alist2Strm:
                 content = path.download_url or f"{self.client.url}/d{path.full_path}"
             elif self.mode == "AlistPath":
                 content = path.full_path
+            logger.debug(f"__file_processer: fallback content = {content}")
 
         await to_thread(local_path.parent.mkdir, parents=True, exist_ok=True)
 
