@@ -295,27 +295,24 @@ class Alist2Strm:
         """
         local_path = self.__get_local_path(path)
 
-        # 为 BDMV 文件生成正确的 URL
-        if self._is_bdmv_file(path):
-            # 确保 BDMV 文件有正确的 URL
-            if self.mode == "AlistURL":
-                content = path.download_url or f"{self.client.url}/d{path.full_path}"
-            elif self.mode == "RawURL":
-                content = path.raw_url or path.download_url or f"{self.client.url}/d{path.full_path}"
-            elif self.mode == "AlistPath":
-                content = path.full_path
-            else:
-                raise ValueError(f"AlistStrm 未知的模式 {self.mode}")
+        # 统一的 URL 生成逻辑，BDMV 文件与普通文件使用相同的逻辑
+        if self.mode == "AlistURL":
+            content = path.download_url
+        elif self.mode == "RawURL":
+            content = path.raw_url
+        elif self.mode == "AlistPath":
+            content = path.full_path
         else:
-            # 普通文件使用原有逻辑
+            raise ValueError(f"AlistStrm 未知的模式 {self.mode}")
+
+        # 如果 URL 为空，提供 fallback（适用于所有文件类型）
+        if not content:
             if self.mode == "AlistURL":
-                content = path.download_url
+                content = f"{self.client.url}/d{path.full_path}"
             elif self.mode == "RawURL":
-                content = path.raw_url
+                content = path.download_url or f"{self.client.url}/d{path.full_path}"
             elif self.mode == "AlistPath":
                 content = path.full_path
-            else:
-                raise ValueError(f"AlistStrm 未知的模式 {self.mode}")
 
         await to_thread(local_path.parent.mkdir, parents=True, exist_ok=True)
 
