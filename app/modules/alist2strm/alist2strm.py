@@ -307,20 +307,26 @@ class Alist2Strm:
         else:
             # 非扁平模式下，需要特殊处理 BDMV 中的主 m2ts 文件
             if is_bdmv_m2ts:
-                # 对于 BDMV 中的 m2ts 文件，直接从路径中提取电影目录名称
+                # 对于 BDMV 中的 m2ts 文件，需要与普通文件保持相同的路径结构
                 # 例如：/Movie/电影/海边的异邦人 (2020)/BDMV/STREAM/00002.m2ts
-                # 我们需要提取 "海边的异邦人 (2020)" 作为文件名
+                # 应该生成：/target_dir/Movie/电影/海边的异邦人 (2020)/海边的异邦人 (2020).strm
                 
-                if "/BDMV/STREAM/" in path.path:
-                    # 找到BDMV的位置，提取BDMV前面的路径
-                    bdmv_index = path.path.find("/BDMV/STREAM/")
-                    path_before_bdmv = path.path[:bdmv_index]
+                # 先按照普通文件的逻辑获取相对路径
+                relative_path_str = path.path.replace(self.source_dir, "", 1)
+                if relative_path_str.startswith("/"):
+                    relative_path_str = relative_path_str[1:]
+                
+                # 找到BDMV的位置，提取BDMV前面的路径部分
+                if "/BDMV/STREAM/" in relative_path_str:
+                    bdmv_index = relative_path_str.find("/BDMV/STREAM/")
+                    path_before_bdmv = relative_path_str[:bdmv_index]
                     # 提取最后一个目录名（电影名）
-                    movie_dir_name = path_before_bdmv.split("/")[-1]
-                    if movie_dir_name:  # 确保电影名不为空
-                        # 使用电影目录名称作为文件名
-                        local_path = self.target_dir / movie_dir_name / f"{movie_dir_name}.strm"
-                        logger.info(f"BDMV m2ts 文件 {path.path} 将被扁平化为 {local_path}")
+                    movie_dir_name = path_before_bdmv.split("/")[-1] if path_before_bdmv else ""
+                    
+                    if movie_dir_name and path_before_bdmv:
+                        # 使用与普通文件相同的路径结构，但文件名改为电影名.strm
+                        local_path = self.target_dir / Path(path_before_bdmv) / f"{movie_dir_name}.strm"
+                        logger.info(f"BDMV m2ts 文件 {path.path} 将被处理为 {local_path}")
                         return local_path
             
             # 非 BDMV m2ts 文件或 BDMV 结构不完整，使用原有逻辑
