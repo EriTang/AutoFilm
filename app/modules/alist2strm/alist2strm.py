@@ -194,6 +194,11 @@ class Alist2Strm:
             if any(folder in path.full_path for folder in ["@eaDir", "Thumbs.db", ".DS_Store"]):
                 return False
 
+            # 完全跳过 BDMV 文件夹内的所有文件（除了我们特殊处理的 .m2ts 文件）
+            if "/BDMV/" in path.full_path and not self._is_bdmv_file(path):
+                logger.debug(f"跳过 BDMV 文件夹内的文件: {path.name}")
+                return False
+
             if path.suffix.lower() not in self.process_file_exts:
                 logger.debug(f"文件 {path.name} 不在处理列表中")
                 return False
