@@ -3,8 +3,9 @@
 set -e
 
 # 配置
-DOCKER_USERNAME="eritang"
-IMAGE_NAME="autofilm-bdmv"
+REGISTRY="ghcr.io"
+GITHUB_USERNAME="eritang"
+IMAGE_NAME="autofilm"
 VERSION="v1.3.3-2-bdmv"
 
 # 颜色输出
@@ -44,10 +45,14 @@ if ! docker buildx version &> /dev/null; then
 fi
 
 # 检查登录状态
-print_info "检查 Docker Hub 登录状态..."
-if ! docker info | grep -q "Username"; then
-    print_warning "未登录 Docker Hub，请先登录"
-    docker login
+print_info "检查 GitHub Container Registry 登录状态..."
+if ! docker info | grep -q "ghcr.io"; then
+    print_warning "未登录 GHCR，请先登录"
+    echo "使用以下命令登录："
+    echo "echo \$GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USERNAME --password-stdin"
+    echo "或者："
+    echo "docker login ghcr.io"
+    exit 1
 fi
 
 # 创建构建器
@@ -64,25 +69,26 @@ docker buildx inspect
 # 构建并推送
 print_info "开始构建多平台镜像..."
 print_info "支持平台: linux/amd64, linux/arm64, linux/arm/v7"
+print_info "推送到: ${REGISTRY}/${GITHUB_USERNAME}/${IMAGE_NAME}"
 
 docker buildx build \
     --platform linux/amd64,linux/arm64,linux/arm/v7 \
-    --tag ${DOCKER_USERNAME}/${IMAGE_NAME}:latest \
-    --tag ${DOCKER_USERNAME}/${IMAGE_NAME}:${VERSION} \
-    --tag ${DOCKER_USERNAME}/${IMAGE_NAME}:bdmv-enhanced \
+    --tag ${REGISTRY}/${GITHUB_USERNAME}/${IMAGE_NAME}:latest \
+    --tag ${REGISTRY}/${GITHUB_USERNAME}/${IMAGE_NAME}:${VERSION} \
+    --tag ${REGISTRY}/${GITHUB_USERNAME}/${IMAGE_NAME}:bdmv-enhanced \
     --push \
     .
 
 print_success "多平台镜像构建完成！"
 print_info "镜像标签："
-echo "  - ${DOCKER_USERNAME}/${IMAGE_NAME}:latest"
-echo "  - ${DOCKER_USERNAME}/${IMAGE_NAME}:${VERSION}"
-echo "  - ${DOCKER_USERNAME}/${IMAGE_NAME}:bdmv-enhanced"
+echo "  - ${REGISTRY}/${GITHUB_USERNAME}/${IMAGE_NAME}:latest"
+echo "  - ${REGISTRY}/${GITHUB_USERNAME}/${IMAGE_NAME}:${VERSION}"
+echo "  - ${REGISTRY}/${GITHUB_USERNAME}/${IMAGE_NAME}:bdmv-enhanced"
 
 # 验证镜像
 print_info "验证镜像..."
-docker buildx imagetools inspect ${DOCKER_USERNAME}/${IMAGE_NAME}:latest
+docker buildx imagetools inspect ${REGISTRY}/${GITHUB_USERNAME}/${IMAGE_NAME}:latest
 
 print_success "构建完成！您可以使用以下命令拉取镜像："
-echo "docker pull ${DOCKER_USERNAME}/${IMAGE_NAME}:latest"
+echo "docker pull ${REGISTRY}/${GITHUB_USERNAME}/${IMAGE_NAME}:latest"
 
