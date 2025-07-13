@@ -280,28 +280,25 @@ class Alist2Strm:
                 logger.info(f"处理 BDMV 目录: {bdmv_root}")
                 logger.info(f"最大文件: {largest_file.full_path}")
                 
-                # 如果是 RawURL 模式，需要重新获取文件的详细信息以确保有 raw_url
+                # 重新获取详细信息以确保有 raw_url
                 if self.mode == "RawURL" and not largest_file.raw_url:
                     logger.debug(f"重新获取 BDMV 文件详细信息: {largest_file.full_path}")
-                    detailed_file = await self.client.get_path_detail(largest_file.full_path)
-                    if detailed_file:
-                        # 保持 full_path 一致性，只更新详细信息
-                        detailed_file.full_path = largest_file.full_path
-                        largest_file = detailed_file
-                        self.bdmv_largest_files[bdmv_root] = detailed_file
-                        logger.info(f"重新获取详细信息成功，raw_url: {detailed_file.raw_url}")
-                    else:
-                        logger.warning(f"重新获取详细信息失败: {largest_file.full_path}")
+                    try:
+                        updated_path = await self.client.async_api_fs_get(largest_file.full_path)
+                        # 保持原有的 full_path，只更新其他属性
+                        original_full_path = largest_file.full_path
+                        largest_file = updated_path
+                        largest_file.full_path = original_full_path
+                    except Exception as e:
+                        logger.warning(f"重新获取 BDMV 文件详细信息失败: {e}")
                 
-                # 获取本地路径并添加到 processed_local_paths
-                logger.debug(f"获取本地路径...")
+                # 处理文件
+                await self.__file_processer(largest_file)
+                
+                # 添加到已处理路径列表
                 local_path = self.__get_local_path(largest_file)
-                logger.info(f"本地路径: {local_path}")
                 self.processed_local_paths.add(local_path)
                 
-                # 使用统一的文件处理逻辑，确保 URL 生成一致
-                logger.debug(f"开始文件处理...")
-                await self.__file_processer(largest_file)
                 logger.info(f"BDMV 文件处理完成: {largest_file.name}")
             except Exception as e:
                 logger.error(f"处理 BDMV 文件 {largest_file.full_path} 时出错：{e}")
