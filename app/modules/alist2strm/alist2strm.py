@@ -152,12 +152,22 @@ class Alist2Strm:
             if not files:
                 continue
 
+            movie_title = self._get_movie_title_from_bdmv_path(bdmv_root)
+            logger.info(f"BDMV 目录 '{movie_title}' 中发现 {len(files)} 个 .m2ts 文件:")
+            
+            # 按大小排序并显示所有文件
+            sorted_files = sorted(files, key=lambda x: x[1], reverse=True)
+            for i, (file_path, file_size) in enumerate(sorted_files):
+                size_mb = file_size / (1024 * 1024)
+                status = "✓ 选中" if i == 0 else "  跳过"
+                logger.info(f"  {status} {file_path.name}: {size_mb:.1f} MB ({file_size} 字节)")
+
             # 找出最大的文件
             largest_file = max(files, key=lambda x: x[1])
             self.bdmv_largest_files[bdmv_root] = largest_file[0]
             
-            movie_title = self._get_movie_title_from_bdmv_path(bdmv_root)
-            logger.info(f"BDMV 目录 '{movie_title}' 中最大文件: {largest_file[0].name} (大小: {largest_file[1]} 字节)")
+            largest_size_mb = largest_file[1] / (1024 * 1024)
+            logger.info(f"BDMV 目录 '{movie_title}' 最终选择: {largest_file[0].name} ({largest_size_mb:.1f} MB)")
 
     def _should_process_bdmv_file(self, path: AlistPath) -> bool:
         """
@@ -262,22 +272,26 @@ class Alist2Strm:
 
         # 完成 BDMV 文件收集，确定最大文件
         self._finalize_bdmv_collections()
-
+        
         # 第二阶段：处理 BDMV 最大文件
         for bdmv_root, largest_file in self.bdmv_largest_files.items():
             try:
-                local_path = self.__get_local_path(largest_file)
-                self.processed_local_paths.add(local_path)
+                # 如果是 RawURL 模式，需要重新获取文件的详细信息以确保有 raw_url
+                if self.mode == "RawURL" and not largest_file.raw_url:
+                    logger.debug(f"重新获取 BDMV 文件详细信息: {largest_file.full_path}")
+                    detailed_file = await self.client.get_path_detail(largest_file.full_path)
+                    if detailed_file:
+                        largest_file = detailed_file
+                        self.bdmv_largest_files[bdmv_root] = detailed_file
+                
+                # 使用统一的文件处理逻辑，确保 URL 生成一致
+                await self.__file_processer(largest_file)
+                logger.debug(f"BDMV 文件处理完成: {largest_file.name}")
+            except Exception as e:
+                logger.error(f"处理 BDMV 文件 {largest_file.full_path} 时出错：{e}")
+                continue
 
-                if not self.overwrite and local_path.exists():
-                    logger.debug(f"BDMV 文件 {local_path.name} 已存在，跳过处理")
-                    continue
-
-                files_to_process.append(largest_file)
-            except OSError as e:
-                logger.warning(f"获取 BDMV 文件 {largest_file.full_path} 本地路径失败：{e}")
-
-        # 第三阶段：并发处理所有文件
+        # 第三阶段：处理普通文件
         async with self.__max_workers, TaskGroup() as tg:
             for path in files_to_process:
                 tg.create_task(self.__file_processer(path))
