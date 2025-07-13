@@ -190,6 +190,10 @@ class Alist2Strm:
             if path.is_dir:
                 return False
 
+            # 跳过系统文件夹和不需要的文件
+            if any(folder in path.full_path for folder in ["@eaDir", "Thumbs.db", ".DS_Store"]):
+                return False
+
             if path.suffix.lower() not in self.process_file_exts:
                 logger.debug(f"文件 {path.name} 不在处理列表中")
                 return False
@@ -286,18 +290,31 @@ class Alist2Strm:
         """
         local_path = self.__get_local_path(path)
 
-        if self.mode == "AlistURL":
-            content = path.download_url
-        elif self.mode == "RawURL":
-            content = path.raw_url
-        elif self.mode == "AlistPath":
-            content = path.full_path
+        # 为 BDMV 文件生成正确的 URL
+        if self._is_bdmv_file(path):
+            # 确保 BDMV 文件有正确的 URL
+            if self.mode == "AlistURL":
+                content = path.download_url or f"{self.client.url}/d{path.full_path}"
+            elif self.mode == "RawURL":
+                content = path.raw_url or path.download_url or f"{self.client.url}/d{path.full_path}"
+            elif self.mode == "AlistPath":
+                content = path.full_path
+            else:
+                raise ValueError(f"AlistStrm 未知的模式 {self.mode}")
         else:
-            raise ValueError(f"AlistStrm 未知的模式 {self.mode}")
+            # 普通文件使用原有逻辑
+            if self.mode == "AlistURL":
+                content = path.download_url
+            elif self.mode == "RawURL":
+                content = path.raw_url
+            elif self.mode == "AlistPath":
+                content = path.full_path
+            else:
+                raise ValueError(f"AlistStrm 未知的模式 {self.mode}")
 
         await to_thread(local_path.parent.mkdir, parents=True, exist_ok=True)
 
-        logger.debug(f"开始处理 {local_path}")
+        logger.debug(f"开始处理 {local_path}, 内容: {content}")
         if local_path.suffix == ".strm":
             async with async_open(local_path, mode="w", encoding="utf-8") as file:
                 await file.write(content)
